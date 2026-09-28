@@ -1,4 +1,4 @@
 window.SUPERSBMART_CONFIG = {
-  SUPABASE_URL: "YAHAN_SUPABASE_URL",
-  SUPABASE_ANON_KEY: "YAHAN_SUPABASE_ANON_KEY"
+  SUPABASE_URL: "https://aubwdlkgscvypagffeif.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_EmKd3UtbUqv4rraqGJ-IrA_2GFBy0vP"
 };
