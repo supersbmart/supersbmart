@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SUPERSBMART - Payment</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header class="topbar"><a href="index.html" class="logo">🛍️ SUPERSBMART</a></header>
+<main class="container">
+  <h1>UPI Payment</h1>
+  <div class="card">
+    <p><strong>Pay to UPI:</strong> <span id="upiId">Loading...</span></p>
+    <div id="qr"></div>
+    <p id="instructions"></p>
+  </div>
+
+  <form id="paymentForm" class="card">
+    <label>Order ID
+      <input id="orderId" required placeholder="Your order ID">
+    </label>
+    <label>UTR / Transaction ID
+      <input id="utr" required minlength="6" maxlength="40" placeholder="Enter UTR / transaction ID">
+    </label>
+    <button class="btn" type="submit">Submit Payment</button>
+    <p id="msg"></p>
+  </form>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(async () => {
+  const upi = document.getElementById('upiId');
+  const qr = document.getElementById('qr');
+  const instructions = document.getElementById('instructions');
+  const msg = document.getElementById('msg');
+
+  try {
+    const s = await SUPERSBMART.getPublicPaymentSettings();
+    upi.textContent = s.upi_id || 'UPI not configured';
+    instructions.textContent = s.payment_instructions || 'Pay using the UPI ID or QR and then submit your UTR.';
+    qr.innerHTML = s.qr_url
+      ? '<img src="'+String(s.qr_url).replace(/"/g,'&quot;')+'" alt="UPI QR Code" style="max-width:300px;width:100%;border-radius:12px">'
+      : '<p>QR code is not available. Use the UPI ID.</p>';
+  } catch(e) {
+    msg.textContent = 'Could not load payment settings.';
+  }
+
+  document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.textContent = 'Submitting...';
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error('Please login first.');
+
+      const orderId = String(document.getElementById('orderId').value ?? '').trim();
+      const utr = String(document.getElementById('utr').value ?? '').trim();
+      if (!orderId || !utr) throw new Error('Order ID and UTR are required.');
+
+      const { data: order, error: oe } = await supabase.from('orders')
+        .select('id,user_id').eq('id', orderId).single();
+      if (oe) throw oe;
+      if (order.user_id !== auth.user.id) throw new Error('This order does not belong to your account.');
+
+      const { error } = await supabase.from('payments').insert({
+        order_id: orderId,
+        user_id: auth.user.id,
+        utr: utr,
+        status: 'pending'
+      });
+      if (error) throw error;
+      msg.textContent = 'Payment submitted. Status: Pending admin verification.';
+    } catch(e) {
+      msg.textContent = e.message || 'Payment submission failed.';
+    }
+  });
+})();
+</script>
+</body>
+</html>

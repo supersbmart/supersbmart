@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SUPERSBMART Admin - Settings</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<header class="topbar"><a href="index.html" class="logo">🛍️ SUPERSBMART Admin</a></header>
+<main class="container">
+  <h1>Website & Payment Settings</h1>
+  <p>Only an authenticated admin can save these settings.</p>
+
+  <form id="settingsForm" class="card">
+    <label>UPI ID
+      <input id="upiId" required placeholder="example@upi">
+    </label>
+    <label>Payment instructions
+      <textarea id="paymentInstructions" rows="4" placeholder="Pay using the UPI ID or QR shown below"></textarea>
+    </label>
+    <label>Customer care
+      <input id="customerCare" placeholder="Support phone/email">
+    </label>
+
+    <div class="card">
+      <h3>QR Code</h3>
+      <input id="qrFile" type="file" accept="image/png,image/jpeg,image/webp">
+      <small>Upload a new QR image. The previous QR remains until the new one is successfully uploaded.</small>
+      <div id="qrPreviewWrap" style="margin-top:12px"></div>
+    </div>
+
+    <button class="btn" type="submit">Save Settings</button>
+    <p id="settingsMsg"></p>
+  </form>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config.js"></script>
+<script src="../assets/js/app.js"></script>
+<script>
+(async () => {
+  const msg = document.getElementById('settingsMsg');
+  const form = document.getElementById('settingsForm');
+  const qrPreviewWrap = document.getElementById('qrPreviewWrap');
+  let current = {};
+
+  function safe(v){ return String(v ?? '').trim(); }
+  function showQR(url){
+    qrPreviewWrap.innerHTML = url
+      ? '<img src="'+String(url).replace(/"/g,'&quot;')+'" alt="Current UPI QR" style="max-width:260px;width:100%;border-radius:12px">'
+      : '<p>No QR uploaded yet.</p>';
+  }
+
+  try {
+    if (!window.SUPERSBMART || !SUPERSBMART.requireAdmin) throw new Error('App configuration is missing.');
+    await SUPERSBMART.requireAdmin();
+    current = await SUPERSBMART.getPublicPaymentSettings();
+    document.getElementById('upiId').value = safe(current.upi_id);
+    document.getElementById('paymentInstructions').value = safe(current.payment_instructions);
+    document.getElementById('customerCare').value = safe(current.customer_care);
+    showQR(current.qr_url);
+  } catch(e) {
+    msg.textContent = e.message || 'Unable to load settings.';
+    form.querySelector('button').disabled = true;
+  }
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    msg.textContent = 'Saving...';
+    try {
+      const file = document.getElementById('qrFile').files[0];
+      let qrUrl = current.qr_url || '';
+      if (file) {
+        qrUrl = await SUPERSBMART.uploadPaymentQR(file);
+      }
+      await SUPERSBMART.savePaymentSettings({
+        upi_id: safe(document.getElementById('upiId').value),
+        qr_url: qrUrl,
+        payment_instructions: safe(document.getElementById('paymentInstructions').value),
+        customer_care: safe(document.getElementById('customerCare').value)
+      });
+      current = await SUPERSBMART.getPublicPaymentSettings();
+      showQR(current.qr_url);
+      document.getElementById('qrFile').value = '';
+      msg.textContent = 'Settings saved successfully.';
+    } catch(e) {
+      msg.textContent = e.message || 'Save failed.';
+    }
+  });
+})();
+</script>
+</body>
+</html>
